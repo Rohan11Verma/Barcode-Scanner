@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tool Tracking System</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      text-align: center;
+    }
+    #scanner-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      height: 300px;
+      margin: 20px auto;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+      width: 80%;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Tool Tracking System</h2>
+  
+  <div id="scanner-container"></div>
+  <button onclick="startScanner()">Start Scanning</button>
+
+  <script>
+    let vehicleNumber = null;
+    let toolNumber = null;
+
+    function startScanner() {
+      if (Quagga.initialized) {
+        Quagga.start();
+        return;
+      }
+
+      Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: document.querySelector('#scanner-container'),
+          constraints: {
+            width: 400,
+            height: 300,
+            facingMode: "environment" // Use rear camera
+          }
+        },
+        decoder: {
+          readers: ["code_128_reader", "ean_reader"] // Common barcode formats
+        }
+      }, function(err) {
+        if (err) {
+          console.error(err);
+          alert("Error starting scanner: " + err.message);
+          return;
+        }
+        Quagga.initialized = true;
+        Quagga.start();
+      });
+
+      Quagga.onDetected(function(result) {
+        let scannedData = result.codeResult.code;
+        handleScannedData(scannedData);
+
+        // Restart scanner after a short delay to prevent double-scanning
+        setTimeout(() => Quagga.start(), 500);
+      });
+    }
+
+    function handleScannedData(data) {
+      if (!vehicleNumber) {
+        vehicleNumber = data;
+        alert(`Vehicle Number: ${vehicleNumber} recorded. Now scan the tool.`);
+      } else if (!toolNumber) {
+        toolNumber = data;
+        alert(`Tool Number: ${toolNumber} recorded.`);
+        sendToGoogleSheets(vehicleNumber, toolNumber, 'Issued');
+        vehicleNumber = null;
+        toolNumber = null;
+      }
+    }
+
+    function sendToGoogleSheets(vehicleNumber, toolNumber, status) {
+      const url = 'YOUR_DEPLOYMENT_URL_HERE'; // Replace with your Google Apps Script URL
+      
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          vehicleNumber,
+          toolNumber,
+          status
+        })
+      })
+      .then(response => {
+        if (response.ok) {
+          alert(`${status} logged successfully!`);
+        } else {
+          alert('Failed to log data.');
+        }
+      })
+      .catch(err => {
+        console.error('Error:', err);
+        alert('Failed to log data.');
+      });
+    }
+  </script>
+
+</body>
+</html>
